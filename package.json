@@ -1,0 +1,26 @@
+{
+  "name": "sada-cruzeiro-e2e",
+  "private": true,
+  "scripts": {
+    "test:e2e": "PLAYWRIGHT_BROWSERS_PATH=0 playwright test -c playwright.config.js --project=chromium --project=mobile",
+    "test:e2e:player": "PLAYWRIGHT_BROWSERS_PATH=0 playwright test -c playwright.config.js e2e/player-section.spec.js --project=chromium --project=mobile",
+    "test:e2e:player:mobile": "PLAYWRIGHT_BROWSERS_PATH=0 playwright test -c playwright.config.js e2e/player-section.spec.js --project=mobile",
+    "test:e2e:design": "PLAYWRIGHT_BROWSERS_PATH=0 E2E_STRICT_DESIGN=1 playwright test --project=chromium",
+    "test:e2e:firefox": "PLAYWRIGHT_BROWSERS_PATH=0 playwright test --project=firefox",
+    "test:e2e:firefox:stable": "PLAYWRIGHT_BROWSERS_PATH=0 E2E_FIREFOX_STABLE=1 E2E_STRICT_DESIGN=0 playwright test -c playwright.config.js --project=firefox --workers=1",
+    "e2e:inspect": "PLAYWRIGHT_BROWSERS_PATH=0 playwright test -c playwright.inspect.config.js --headed --workers=1",
+    "test:e2e:ui": "PLAYWRIGHT_BROWSERS_PATH=0 playwright test --ui --project=chromium",
+    "test:e2e:headed": "PLAYWRIGHT_BROWSERS_PATH=0 playwright test --headed --project=chromium --workers=1",
+    "test:e2e:chrome": "PLAYWRIGHT_BROWSERS_PATH=0 PW_CHANNEL=chrome playwright test --project=chromium",
+    "test:e2e:debug": "PLAYWRIGHT_BROWSERS_PATH=0 playwright test --debug --project=chromium --workers=1",
+    "playwright:install": "PLAYWRIGHT_BROWSERS_PATH=0 playwright install chromium firefox",
+    "playwright:install:firefox": "PLAYWRIGHT_BROWSERS_PATH=0 playwright install firefox"
+  },
+  "engines": {
+    "node": ">=18"
+  },
+  "devDependencies": {
+    "@playwright/test": "^1.59.1",
+    "@types/node": "^25.6.0"
+  }
+}
