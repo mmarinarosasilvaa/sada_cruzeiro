@@ -3,6 +3,7 @@ const { getArticlePageUrl } = require('../constants/urls');
 const { ArticleHeroComponent } = require('../components/ArticleHeroComponent');
 const { ArticleContentComponent } = require('../components/ArticleContentComponent');
 const { ArticleSidebarComponent } = require('../components/ArticleSidebarComponent');
+const { ArticleSharingComponent } = require('../components/ArticleSharingComponent');
 
 class ArticlePage {
   /**
@@ -23,6 +24,10 @@ class ArticlePage {
 
   sidebar() {
     return new ArticleSidebarComponent(this.page);
+  }
+
+  sharing() {
+    return new ArticleSharingComponent(this.page);
   }
 
   async open() {

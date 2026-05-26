@@ -42,6 +42,206 @@ class CastListComponent {
     return this.root().locator(c.SELECTORS.card);
   }
 
+  /** TC-IMAGE-001: imagens dos cards com lazy loading ativo */
+  async expectImagesLazyLoaded() {
+    const report = await this.root().evaluate((root, selectors) => {
+      const images = [
+        ...root.querySelectorAll(`${selectors.cardPrimaryImage}, ${selectors.cardHoverImage}`),
+      ];
+      return images.map((img) => ({
+        src: (img.getAttribute('src') || img.getAttribute('data-src') || '').slice(0, 80),
+        loading: img.getAttribute('loading') || '',
+        pass: img.getAttribute('loading') === 'lazy' || !!img.getAttribute('data-src'),
+      }));
+    }, c.SELECTORS);
+
+    expect(report.length, 'Cast List deve ter imagens nos cards').toBeGreaterThan(0);
+    for (const img of report) {
+      expect(
+        img.pass,
+        `TC-IMAGE-001: imagem do Cast List deve ter lazy loading: ${JSON.stringify(img)}`
+      ).toBeTruthy();
+    }
+  }
+
+  // ─── Filtros de Categoria (AUT-CL-F) ──────────────────────────────────────
+
+  /** AUT-CL-F01: abas de categoria visíveis (ao menos 1) */
+  async expectCategoryTabsVisible() {
+    const tabs = this.root().locator(c.SELECTORS.categoryTabs);
+    const count = await tabs.count();
+    expect(count, 'AUT-CL-F01: deve haver ao menos 1 aba de categoria').toBeGreaterThan(0);
+    await expect(tabs.first(), 'AUT-CL-F01: primeira aba visível').toBeVisible();
+  }
+
+  /** AUT-CL-F02: clique em aba muda o conteúdo exibido */
+  async expectTabClickChangesContent() {
+    const tabs = this.root().locator(c.SELECTORS.categoryTabs);
+    const count = await tabs.count();
+    if (count < 2) {
+      console.log('[AUT-CL-F02] Menos de 2 abas — mudança de conteúdo não aplicável.');
+      return;
+    }
+
+    const contentBefore = ((await this.cardsGrid().textContent()) || '').trim().slice(0, 200);
+    await tabs.nth(1).click();
+    await this.page.waitForTimeout(400);
+
+    const contentAfter = ((await this.cardsGrid().textContent()) || '').trim().slice(0, 200);
+    expect(
+      contentAfter !== contentBefore,
+      'AUT-CL-F02: conteúdo deve mudar após clicar em aba diferente'
+    ).toBeTruthy();
+  }
+
+  /** AUT-CL-F03: aba ativa tem aria-selected='true' ou classe 'selected' */
+  async expectActiveTabHasAriaSelected() {
+    const activeTab = this.root().locator(c.SELECTORS.activeTab).first();
+    const count = await activeTab.count();
+
+    if (count > 0) {
+      await expect(activeTab, 'AUT-CL-F03: aba ativa visível').toBeVisible();
+    } else {
+      const tabs = this.root().locator(c.SELECTORS.categoryTabs);
+      const firstSelected = await tabs.first().evaluate(
+        (el) => el.classList.contains('selected') || el.getAttribute('aria-selected') === 'true'
+      );
+      expect(firstSelected, 'AUT-CL-F03: primeira aba deve iniciar selecionada').toBeTruthy();
+    }
+  }
+
+  /** AUT-CL-F04: cards da categoria selecionada existem (count > 0) */
+  async expectCategoryCardsExist() {
+    const count = await this.cards().count();
+    expect(count, 'AUT-CL-F04: categoria deve ter ao menos 1 card').toBeGreaterThan(0);
+  }
+
+  /** AUT-CL-F05: Tab navega entre abas de categoria */
+  async expectKeyboardTabNavigatesTabs() {
+    const tabs = this.root().locator(c.SELECTORS.categoryTabs);
+    if ((await tabs.count()) < 2) return;
+
+    await this.page.evaluate(() => {
+      if (document.activeElement instanceof HTMLElement) document.activeElement.blur();
+    });
+
+    const firstTab = tabs.first();
+    await firstTab.focus();
+    await this.page.keyboard.press('Tab');
+    await this.page.waitForTimeout(100);
+
+    const secondFocused = await tabs.nth(1).evaluate(
+      (el) => el === document.activeElement || el.contains(document.activeElement)
+    );
+    expect(secondFocused, 'AUT-CL-F05: Tab deve mover foco para a próxima aba').toBeTruthy();
+  }
+
+  /** AUT-CL-F06: teclas Arrow Right/Left alternam entre abas */
+  async expectArrowKeysSwitchTabs() {
+    const tabs = this.root().locator(c.SELECTORS.categoryTabs);
+    if ((await tabs.count()) < 2) return;
+
+    await tabs.first().focus();
+    const supportsArrow = await tabs.first().evaluate((el) => {
+      return el.getAttribute('role') === 'tab' || el.tagName.toLowerCase() === 'button';
+    });
+
+    if (!supportsArrow) {
+      console.log('[AUT-CL-F06] Elemento não suporta arrow keys — usando Enter como fallback.');
+      await tabs.nth(1).focus();
+      await this.page.keyboard.press('Enter');
+      await this.page.waitForTimeout(300);
+      const selected = await tabs.nth(1).evaluate(
+        (el) => el.classList.contains('selected') || el.getAttribute('aria-selected') === 'true'
+      );
+      expect(selected, 'AUT-CL-F06 fallback: Enter seleciona aba').toBeTruthy();
+      return;
+    }
+
+    await this.page.keyboard.press('ArrowRight');
+    await this.page.waitForTimeout(300);
+    const secondActive = await tabs.nth(1).evaluate(
+      (el) => el === document.activeElement || el.classList.contains('selected') || el.getAttribute('aria-selected') === 'true'
+    );
+    expect(secondActive, 'AUT-CL-F06: ArrowRight deve ativar a aba seguinte').toBeTruthy();
+  }
+
+  // ─── Cards de Jogadores (AUT-CL-C) ────────────────────────────────────────
+
+  /** AUT-CL-C01: imagens dos cards têm src válido */
+  async expectCardImagesHaveSrc() {
+    const report = await this.root().evaluate((root, selectors) => {
+      return [...root.querySelectorAll(selectors.cardPrimaryImage)].map((img) => ({
+        src: (img.getAttribute('src') || img.getAttribute('data-src') || '').slice(0, 80),
+        pass: !!(img.getAttribute('src') || img.getAttribute('data-src')),
+      }));
+    }, c.SELECTORS);
+
+    expect(report.length, 'AUT-CL-C01: deve haver imagens nos cards').toBeGreaterThan(0);
+    for (const img of report) {
+      expect(img.pass, `AUT-CL-C01: imagem sem src: ${JSON.stringify(img)}`).toBeTruthy();
+    }
+  }
+
+  /** AUT-CL-C02: imagens dos cards têm alt text */
+  async expectCardImagesHaveAltText() {
+    const report = await this.root().evaluate((root, selectors) => {
+      return [...root.querySelectorAll(selectors.cardPrimaryImage)].map((img) => {
+        const alt = (img.getAttribute('alt') || '').trim();
+        const ariaHidden = img.getAttribute('aria-hidden') === 'true';
+        return {
+          src: (img.getAttribute('src') || '').slice(0, 60),
+          alt,
+          pass: ariaHidden || alt.length > 0,
+        };
+      });
+    }, c.SELECTORS);
+
+    expect(report.length, 'AUT-CL-C02: deve haver imagens').toBeGreaterThan(0);
+    for (const img of report) {
+      expect(img.pass, `AUT-CL-C02: imagem sem alt text: ${JSON.stringify(img)}`).toBeTruthy();
+    }
+  }
+
+  /** AUT-CL-C03: número do jogador (quando presente) é 1-2 dígitos */
+  async expectCardNumbersValid() {
+    const numbers = await this.root().evaluate((root, selectors) => {
+      return [...root.querySelectorAll(selectors.cardNumber)].map((el) => ({
+        text: (el.textContent || '').trim(),
+        pass: /^[0-9]{1,2}$/.test((el.textContent || '').trim()),
+      }));
+    }, c.SELECTORS);
+
+    if (numbers.length === 0) {
+      console.log('[AUT-CL-C03] Números dos jogadores não presentes nesta build — campo opcional.');
+      return;
+    }
+    for (const num of numbers) {
+      expect(
+        num.pass,
+        `AUT-CL-C03: número do jogador deve ser 1-2 dígitos: "${num.text}"`
+      ).toBeTruthy();
+    }
+  }
+
+  /** AUT-CL-C04: posição do jogador (quando presente) não está vazia */
+  async expectCardPositionsNotEmpty() {
+    const positions = await this.root().evaluate((root, selectors) => {
+      return [...root.querySelectorAll(selectors.cardPosition)].map((el) => ({
+        text: (el.textContent || '').trim(),
+        pass: (el.textContent || '').trim().length > 0,
+      }));
+    }, c.SELECTORS);
+
+    if (positions.length === 0) {
+      console.log('[AUT-CL-C04] Posições dos jogadores não presentes nesta build — campo opcional.');
+      return;
+    }
+    for (const pos of positions) {
+      expect(pos.pass, `AUT-CL-C04: posição não pode ser vazia: ${JSON.stringify(pos)}`).toBeTruthy();
+    }
+  }
+
   async expectCastListVisible() {
     await expect(this.root(), 'Cast List visível').toBeVisible();
     await expect(this.teamRoster(), 'Cast List header visível').toBeVisible();

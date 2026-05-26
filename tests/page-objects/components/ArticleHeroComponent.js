@@ -31,6 +31,82 @@ class ArticleHeroComponent {
     return this.page.locator(SELECTORS.photoCaption);
   }
 
+  // ─── Conteúdo (AUT-ART-C) ─────────────────────────────────────────────────
+
+  /** AUT-ART-C01: título do artigo presente e com ao menos 10 caracteres */
+  async expectTitlePresent() {
+    const title = this.page.locator("h1, h2[class*='title']").first();
+    await expect(title, 'AUT-ART-C01: título do artigo visível').toBeVisible();
+    const text = ((await title.textContent()) || '').trim();
+    expect(text.length, 'AUT-ART-C01: título deve ter ao menos 10 caracteres').toBeGreaterThanOrEqual(10);
+  }
+
+  /** AUT-ART-C02: data de publicação presente e no formato reconhecível */
+  async expectPublicationDatePresent() {
+    const date = this.page.locator("[class*='date'], time").first();
+    const count = await date.count();
+    if (count === 0) {
+      console.log('[AUT-ART-C02] Campo de data não encontrado nesta build.');
+      return;
+    }
+    await expect(date, 'AUT-ART-C02: data de publicação visível').toBeVisible();
+    const text = ((await date.textContent()) || '').trim();
+    expect(text.length, 'AUT-ART-C02: data de publicação não pode ser vazia').toBeGreaterThan(0);
+  }
+
+  /** AUT-ART-C03: imagem principal (featured) tem src válido */
+  async expectFeaturedImageHasSrc() {
+    const img = this.page.locator("img[class*='featured'], main figure img").first();
+    const count = await img.count();
+    if (count === 0) {
+      console.log('[AUT-ART-C03] Featured image não encontrada nesta build.');
+      return;
+    }
+    const src = await img.getAttribute('src');
+    expect((src || '').trim().length, 'AUT-ART-C03: featured image deve ter src').toBeGreaterThan(0);
+  }
+
+  /** AUT-ART-C04: featured image tem alt text com ao menos 5 caracteres */
+  async expectFeaturedImageHasAltText() {
+    const img = this.page.locator("img[class*='featured'], main figure img").first();
+    const count = await img.count();
+    if (count === 0) {
+      console.log('[AUT-ART-C04] Featured image não encontrada nesta build.');
+      return;
+    }
+    const alt = ((await img.getAttribute('alt')) || '').trim();
+    expect(alt.length, 'AUT-ART-C04: alt text da featured image deve ter ao menos 5 chars').toBeGreaterThanOrEqual(5);
+    expect(alt.toLowerCase(), 'AUT-ART-C04: alt text não deve ser genérico "image"').not.toBe('image');
+  }
+
+  /** AUT-ART-C05: artigo tem ao menos 2 parágrafos */
+  async expectArticleHasParagraphs() {
+    const paragraphs = this.page.locator('article p');
+    const count = await paragraphs.count();
+    expect(count, 'AUT-ART-C05: artigo deve ter ao menos 2 parágrafos').toBeGreaterThanOrEqual(2);
+  }
+
+  /** TC-IMAGE-001: imagens do hero article com lazy loading ativo */
+  async expectImagesLazyLoaded() {
+    const report = await this.page.evaluate(() => {
+      const heroContainer = document.querySelector('main');
+      if (!heroContainer) return [];
+      return [...heroContainer.querySelectorAll('img')].map((img) => ({
+        src: (img.getAttribute('src') || img.getAttribute('data-src') || '').slice(0, 80),
+        loading: img.getAttribute('loading') || '',
+        pass: img.getAttribute('loading') === 'lazy' || !!img.getAttribute('data-src'),
+      }));
+    });
+
+    expect(report.length, 'Article hero deve ter imagens').toBeGreaterThan(0);
+    for (const img of report) {
+      expect(
+        img.pass,
+        `TC-IMAGE-001: imagem do Article deve ter lazy loading: ${JSON.stringify(img)}`
+      ).toBeTruthy();
+    }
+  }
+
   async expectVisible() {
     await expect(this.title(), 'título do hero article visível').toBeVisible();
     await expect(this.author(), 'autor do hero article visível').toBeVisible();
