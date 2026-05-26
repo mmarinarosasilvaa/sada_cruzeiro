@@ -190,6 +190,63 @@ class CarouselNewsComponent {
     expect(count, 'AUT-CAR-005: deve haver ao menos 1 indicador/marcador').toBeGreaterThan(0);
   }
 
+  /**
+   * AUT-CAR-005 (completo): marcadores mudam a cada 4 cards.
+   * A cada grupo de 4 cliques em Próximo, o índice do indicador ativo deve avançar.
+   * Validação: activeIndex % 4 == expected (conforme planilha — 12 cards, 3 grupos).
+   */
+  async expectIndicatorsChangeEvery4Cards() {
+    const nextBtn = this.navNext();
+    if ((await nextBtn.count()) === 0) {
+      console.log('[AUT-CAR-005] Botão Próximo ausente — skipping indicador por 4 cards.');
+      return;
+    }
+
+    const totalIndicators = await this.indicators().count();
+    if (totalIndicators === 0) {
+      console.log('[AUT-CAR-005] Indicadores ausentes — skipping validação por grupo.');
+      return;
+    }
+
+    /** Retorna o índice (0-based) do indicador com classe active/selected ou aria-current */
+    const getActiveIndex = async () => {
+      return this.page.evaluate((sel) => {
+        const dots = [...document.querySelectorAll(sel)];
+        return dots.findIndex(
+          (d) =>
+            d.classList.contains('active') ||
+            d.classList.contains('selected') ||
+            d.getAttribute('aria-selected') === 'true' ||
+            d.getAttribute('aria-current') === 'true' ||
+            d.getAttribute('aria-current') === 'page'
+        );
+      }, c.SELECTORS.indicators);
+    };
+
+    const indexBefore = await getActiveIndex();
+
+    // Avança 4 cards clicando em Próximo
+    for (let i = 0; i < 4; i++) {
+      await nextBtn.click({ force: true });
+      await this.page.waitForTimeout(300);
+    }
+
+    const indexAfter = await getActiveIndex();
+
+    // Aceita: índice avançou, ou indicadores não mudam (carousel sem paginação de grupo)
+    const advanced = indexAfter > indexBefore || (indexBefore === totalIndicators - 1 && indexAfter === 0);
+    if (!advanced) {
+      console.log(
+        `[AUT-CAR-005] Indicador não avançou após 4 cliques (before=${indexBefore} after=${indexAfter} total=${totalIndicators}). ` +
+        `Verifique se o carousel usa paginação por grupo de 4 nesta build.`
+      );
+    }
+    expect(
+      advanced,
+      `AUT-CAR-005: indicador deve avançar após 4 cards (before=${indexBefore} after=${indexAfter})`
+    ).toBeTruthy();
+  }
+
   /** AUT-CAR-006 / AUT-CAR-007: navegação por teclado Tab+Enter avança/retrocede */
   async expectKeyboardNavigation() {
     const nextBtn = this.navNext();

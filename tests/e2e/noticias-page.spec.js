@@ -108,6 +108,20 @@ test.describe('Página de Notícias — Carousel News', () => {
     });
 
     /**
+     * AUT-CAR-005 (completo): marcadores mudam a cada 4 cards.
+     * Planilha: activeIndex % 4 == expected — grupos de 4 cards alteram o indicador ativo.
+     * Navega diretamente sem esperar visibilidade do root (falha de BUG-001 tratada no component).
+     */
+    test('AUT-CAR-005: marcadores mudam a cada grupo de 4 cards no chromium', async ({ page }, testInfo) => {
+      test.skip(!isChromiumDesktop(testInfo), 'Validação de grupo de 4 apenas no chromium desktop');
+      const { CarouselNewsComponent } = require('../page-objects/components/CarouselNewsComponent');
+      const { getCarouselNewsPageUrl } = require('../page-objects/constants/urls');
+      await page.goto(getCarouselNewsPageUrl(), { waitUntil: 'load', timeout: 90_000 });
+      await page.waitForTimeout(1500);
+      await new CarouselNewsComponent(page).expectIndicatorsChangeEvery4Cards();
+    });
+
+    /**
      * AUT-CAR-006: Tab+Enter avança card
      * AUT-CAR-007: Shift+Tab+Enter retrocede card
      */

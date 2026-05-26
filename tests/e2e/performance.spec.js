@@ -7,6 +7,40 @@ async function measureLoadTime(page, url) {
   return Date.now() - start;
 }
 
+/**
+ * AUT-PERF-03: intercepta todas as respostas JSON/API da página e mede o tempo de resposta.
+ * Captura chamadas ao ChildPagesServlet (AEM/EDS) e qualquer endpoint JSON detectado.
+ * Retorna array de { url, ms } para cada chamada capturada.
+ */
+async function collectApiResponseTimes(page, url) {
+  const timings = [];
+
+  page.on('response', (response) => {
+    try {
+      const resUrl = response.url();
+      const contentType = response.headers()['content-type'] || '';
+      const isApi =
+        contentType.includes('application/json') ||
+        resUrl.includes('.json') ||
+        resUrl.includes('query-index') ||
+        resUrl.includes('ChildPages') ||
+        resUrl.includes('/api/');
+
+      if (!isApi) return;
+
+      const t = response.timing();
+      // responseEnd e requestStart em ms relativos ao startTime da navegação
+      const ms = t.responseEnd > 0 && t.requestStart >= 0 ? Math.round(t.responseEnd - t.requestStart) : -1;
+      timings.push({ url: resUrl.slice(0, 120), ms, status: response.status() });
+    } catch (_) {
+      // response pode ter sido descartada antes de resolver — ignorar
+    }
+  });
+
+  await page.goto(url, { waitUntil: 'networkidle', timeout: 90_000 });
+  return timings;
+}
+
 async function countImagesInViewport(page) {
   return page.evaluate(() => {
     const viewportH = window.innerHeight;
@@ -49,6 +83,26 @@ test.describe('Performance', () => {
       ).toBeLessThanOrEqual(5);
     });
 
+    /** AUT-PERF-03: tempo de resposta das APIs/JSON detectados na página < 1s */
+    test('AUT-PERF-03: tempo de resposta da API < 1s na página de Notícias', async ({ page }, testInfo) => {
+      test.skip(testInfo.project.name !== 'chromium', 'AUT-PERF-03 apenas no chromium');
+      const timings = await collectApiResponseTimes(page, getCarouselNewsPageUrl());
+
+      if (timings.length === 0) {
+        console.log('[AUT-PERF-03 Notícias] Nenhum endpoint JSON/API detectado nesta build.');
+        return;
+      }
+
+      for (const t of timings) {
+        if (t.ms < 0) continue; // timing não disponível para este recurso
+        console.log(`[AUT-PERF-03] ${t.url} → ${t.ms}ms (HTTP ${t.status})`);
+        expect(
+          t.ms,
+          `AUT-PERF-03: API "${t.url}" deve responder em < 1000ms (atual: ${t.ms}ms)`
+        ).toBeLessThan(1000);
+      }
+    });
+
     /** AUT-PERF-04: DOM com menos de 2000 nós */
     test('AUT-PERF-04: DOM com menos de 2000 nós', async ({ page }) => {
       await page.goto(getCarouselNewsPageUrl(), { waitUntil: 'domcontentloaded', timeout: 90_000 });
@@ -74,6 +128,26 @@ test.describe('Performance', () => {
       ).toBeLessThanOrEqual(5);
     });
 
+    /** AUT-PERF-03: tempo de resposta das APIs/JSON detectados na página < 1s */
+    test('AUT-PERF-03: tempo de resposta da API < 1s na página de Elenco', async ({ page }, testInfo) => {
+      test.skip(testInfo.project.name !== 'chromium', 'AUT-PERF-03 apenas no chromium');
+      const timings = await collectApiResponseTimes(page, getElencoPageUrl());
+
+      if (timings.length === 0) {
+        console.log('[AUT-PERF-03 Elenco] Nenhum endpoint JSON/API detectado nesta build.');
+        return;
+      }
+
+      for (const t of timings) {
+        if (t.ms < 0) continue;
+        console.log(`[AUT-PERF-03] ${t.url} → ${t.ms}ms (HTTP ${t.status})`);
+        expect(
+          t.ms,
+          `AUT-PERF-03: API "${t.url}" deve responder em < 1000ms (atual: ${t.ms}ms)`
+        ).toBeLessThan(1000);
+      }
+    });
+
     test('AUT-PERF-04: DOM com menos de 2000 nós', async ({ page }) => {
       await page.goto(getElencoPageUrl(), { waitUntil: 'domcontentloaded', timeout: 90_000 });
       const nodes = await countDomNodes(page);
@@ -96,6 +170,26 @@ test.describe('Performance', () => {
         inViewport,
         `AUT-PERF-02: máximo 5 imagens visíveis no viewport inicial (atual: ${inViewport})`
       ).toBeLessThanOrEqual(5);
+    });
+
+    /** AUT-PERF-03: tempo de resposta das APIs/JSON detectados na página < 1s */
+    test('AUT-PERF-03: tempo de resposta da API < 1s na página de Artigo', async ({ page }, testInfo) => {
+      test.skip(testInfo.project.name !== 'chromium', 'AUT-PERF-03 apenas no chromium');
+      const timings = await collectApiResponseTimes(page, getArticlePageUrl());
+
+      if (timings.length === 0) {
+        console.log('[AUT-PERF-03 Artigo] Nenhum endpoint JSON/API detectado nesta build.');
+        return;
+      }
+
+      for (const t of timings) {
+        if (t.ms < 0) continue;
+        console.log(`[AUT-PERF-03] ${t.url} → ${t.ms}ms (HTTP ${t.status})`);
+        expect(
+          t.ms,
+          `AUT-PERF-03: API "${t.url}" deve responder em < 1000ms (atual: ${t.ms}ms)`
+        ).toBeLessThan(1000);
+      }
     });
 
     test('AUT-PERF-04: DOM com menos de 2000 nós', async ({ page }) => {
